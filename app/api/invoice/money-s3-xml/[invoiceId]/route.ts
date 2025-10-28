@@ -1,5 +1,5 @@
 import { authOptions } from "@/lib/auth";
-import { s3Client } from "@/lib/digital-ocean-s3";
+import { getBlockBlobClient } from "@/lib/azure-blob";
 import { prismadb } from "@/lib/prisma";
 import { fillXmlTemplate } from "@/lib/xml-generator";
 import { PutObjectAclCommand, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -47,19 +47,16 @@ export async function GET(req: Request, props: { params: Promise<{ invoiceId: st
   const buffer = Buffer.from(xmlString);
 
   //Upload xml to S3 bucket and return url
-  const bucketParamsJSON = {
-    Bucket: process.env.DO_BUCKET,
-    Key: `xml/invoice-${invoiceId}.xml`,
-    Body: buffer,
-    ContentType: "application/json",
-    ContentDisposition: "inline",
-    ACL: "public-read" as const,
-  };
-
-  await s3Client.send(new PutObjectCommand(bucketParamsJSON));
+  const blob = getBlockBlobClient(`xml/invoice-${invoiceId}.xml`);
+  await blob.uploadData(buffer, {
+    blobHTTPHeaders: {
+      blobContentType: "application/json",
+      blobContentDisposition: "inline",
+    },
+  });
 
   //S3 bucket url for the invoice
-  const urlMoneyS3 = `https://${process.env.DO_BUCKET}.${process.env.DO_REGION}.digitaloceanspaces.com/xml/invoice-${invoiceId}.xml`;
+  const urlMoneyS3 = `https://${process.env.AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/${process.env.AZURE_BLOB_CONTAINER}/xml/invoice-${invoiceId}.xml`;
 
   //console.log(urlMoneyS3, "url MoneyS3");
 

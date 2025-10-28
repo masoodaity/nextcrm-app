@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { s3Client } from "@/lib/digital-ocean-s3";
-import { PutObjectAclCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getBlockBlobClient } from "@/lib/azure-blob";
 import { prismadb } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import axios from "axios";
 import { getRossumToken } from "@/lib/get-rossum-token";
+import { getDocumentIntelligenceClient, extractInvoiceFields } from "@/lib/azure-document-intelligence";
 
 const FormData = require("form-data");
 
@@ -28,89 +28,115 @@ export async function POST(request: NextRequest) {
   const buffer = Buffer.from(bytes);
   console.log("Buffer:", buffer);
 
-  //Rossum integration
-  const rossumURL = process.env.ROSSUM_API_URL;
-  const queueId = process.env.ROSSUM_QUEUE_ID;
-  const queueUploadUrl = `${rossumURL}/uploads?queue=${queueId}`;
-  const token = await getRossumToken();
+  // Rossum integration (optional). If not configured, skip gracefully
+  let rossumDocument: any | null = null;
+  let rossumAnnotationId: string | null = null;
+  try {
+    const rossumURL = process.env.ROSSUM_API_URL;
+    const queueId = process.env.ROSSUM_QUEUE_ID;
+    if (!rossumURL || !queueId) {
+      throw new Error("Rossum not configured");
+    }
 
-  const form = new FormData();
-  form.append("content", buffer, file.name);
+    const queueUploadUrl = `${rossumURL}/uploads?queue=${queueId}`;
+    const token = await getRossumToken();
 
-  console.log("FORM DATA:", form);
+    const form = new FormData();
+    form.append("content", buffer, file.name);
 
-  const uploadInvoiceToRossum = await axios.post(queueUploadUrl, form, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+    console.log("FORM DATA:", form);
 
-  console.log("Response", uploadInvoiceToRossum.data);
+    const uploadInvoiceToRossum = await axios.post(queueUploadUrl, form, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-  const rossumTask = await axios.get(uploadInvoiceToRossum.data.url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+    console.log("Response", uploadInvoiceToRossum.data);
 
-  console.log("Rossum task: ", rossumTask.data);
+    const rossumTask = await axios.get(uploadInvoiceToRossum.data.url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-  const rossumUploadData = await axios.get(rossumTask.data.content.upload, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+    console.log("Rossum task: ", rossumTask.data);
 
-  console.log("Rossum upload data: ", rossumUploadData.data);
+    const rossumUploadData = await axios.get(rossumTask.data.content.upload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-  const rossumDocument = await axios.get(rossumUploadData.data.documents[0], {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+    console.log("Rossum upload data: ", rossumUploadData.data);
 
-  if (rossumDocument.status !== 200) {
-    throw new Error("Could not get Rossum document");
+    const rd = await axios.get(rossumUploadData.data.documents[0], {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (rd.status !== 200) {
+      throw new Error("Could not get Rossum document");
+    }
+    rossumDocument = rd;
+    rossumAnnotationId = rossumDocument.data.annotations[0]?.split("/").pop() ?? null;
+    console.log("Rossum document: ", rossumDocument.data);
+  } catch (e) {
+    console.log("Rossum integration skipped:", (e as Error).message);
   }
-
-  console.log("Rossum document: ", rossumDocument.data);
 
   const invoiceFileName = "invoices/" + new Date().getTime() + "-" + file.name;
   console.log("Invoice File Name:", invoiceFileName);
 
-  console.log("UPloading to S3(Digital Ocean)...", invoiceFileName);
+  console.log("Uploading to Azure Blob Storage...", invoiceFileName);
   try {
-    const bucketParams = {
-      Bucket: process.env.DO_BUCKET,
-      Key: invoiceFileName,
-      Body: buffer,
-      ContentType: file.type,
-      ContentDisposition: "inline",
-      ACL: "public-read" as const,
-    };
-
-    await s3Client.send(new PutObjectCommand(bucketParams));
+    const blob = getBlockBlobClient(invoiceFileName);
+    await blob.uploadData(buffer, {
+      blobHTTPHeaders: {
+        blobContentType: file.type,
+        blobContentDisposition: "inline",
+      },
+    });
   } catch (err) {
-    console.log("Error - uploading to S3(Digital Ocean)", err);
+    console.log("Error - uploading to Azure Blob Storage", err);
   }
 
   console.log("Creating Item in DB...");
   try {
-    //S3 bucket url for the invoice
-    const url = `https://${process.env.DO_BUCKET}.${process.env.DO_REGION}.digitaloceanspaces.com/${invoiceFileName}`;
-    console.log("URL in Digital Ocean:", url);
+    // Azure blob URL for the invoice
+    const url = `https://${process.env.AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/${process.env.AZURE_BLOB_CONTAINER}/${invoiceFileName}`;
+    console.log("URL in Azure Blob:", url);
 
-    const rossumAnnotationId = rossumDocument.data.annotations[0]
-      .split("/")
-      .pop();
-
-    console.log("Annotation ID:", rossumAnnotationId);
+    if (rossumAnnotationId) {
+      console.log("Annotation ID:", rossumAnnotationId);
+    }
     //Save the data to the database
+
+    // Try Azure Document Intelligence (optional)
+    let parsed: any = null;
+    try {
+      const endpoint = process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT;
+      const key = process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY;
+      if (endpoint && key) {
+        const client = getDocumentIntelligenceClient();
+        // Send the file bytes directly so we don't require a public URL/SAS
+        const poller = await client.beginAnalyzeDocument(
+          "prebuilt-invoice",
+          buffer
+        );
+        const result = await poller.pollUntilDone();
+        parsed = extractInvoiceFields(result);
+        console.log("ADI parsed fields:", parsed);
+      }
+    } catch (e) {
+      console.log("Azure Document Intelligence skipped:", (e as Error).message);
+    }
 
     await prismadb.invoices.create({
       data: {
         last_updated_by: session.user.id,
-        date_due: new Date(),
+        date_due: parsed?.dueDate ?? new Date(),
         description: "Incoming invoice",
         document_type: "invoice",
         invoice_type: "Taxable document",
@@ -119,10 +145,21 @@ export async function POST(request: NextRequest) {
         assigned_user_id: session.user.id,
         invoice_file_url: url,
         invoice_file_mimeType: file.type,
-        rossum_status: "importing",
-        rossum_document_url: rossumDocument.data.annotations[0],
-        rossum_document_id: rossumDocument.data.id.toString(),
-        rossum_annotation_url: rossumDocument.data.annotations[0],
+        // UI shows Number from variable_symbol; store both for compatibility
+        variable_symbol: parsed?.invoiceNumber ?? undefined,
+        invoice_number: parsed?.invoiceNumber ?? undefined,
+        invoice_amount:
+          parsed?.invoiceTotal != null
+            ? String(parsed?.invoiceTotal)
+            : undefined,
+        invoice_currency: parsed?.currency ?? undefined,
+        partner: parsed?.vendorName ?? undefined,
+        order_number: parsed?.purchaseOrder ?? undefined,
+        date_of_case: parsed?.invoiceDate ?? undefined,
+        rossum_status: rossumDocument ? "importing" : "skipped",
+        rossum_document_url: rossumDocument ? rossumDocument.data.annotations[0] : null,
+        rossum_document_id: rossumDocument ? rossumDocument.data.id.toString() : null,
+        rossum_annotation_url: rossumDocument ? rossumDocument.data.annotations[0] : null,
         rossum_annotation_id: rossumAnnotationId,
       },
     });

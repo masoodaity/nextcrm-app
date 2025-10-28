@@ -4,7 +4,7 @@ Next step is to update invoice metadata from annotation in database (invoice tab
 TODO: think about how to handle annotation files security - now they are public
 */
 import { authOptions } from "@/lib/auth";
-import { s3Client } from "@/lib/digital-ocean-s3";
+import { getBlockBlobClient } from "@/lib/azure-blob";
 import { getRossumToken } from "@/lib/get-rossum-token";
 import { prismadb } from "@/lib/prisma";
 import { PutObjectAclCommand, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -315,19 +315,16 @@ export async function GET(req: Request, props: { params: Promise<{ annotationId:
   const fileNameJSON = `rossum/invoice_annotation-${annotationId}.json`;
   const fileNameXML = `rossum/invoice_annotation-${annotationId}.xml`;
 
-  const bucketParamsJSON = {
-    Bucket: process.env.DO_BUCKET,
-    Key: fileNameJSON,
-    Body: buffer,
-    ContentType: "application/json",
-    ContentDisposition: "inline",
-    ACL: "public-read" as const,
-  };
-
-  await s3Client.send(new PutObjectCommand(bucketParamsJSON));
+  const blobJSON = getBlockBlobClient(fileNameJSON);
+  await blobJSON.uploadData(buffer, {
+    blobHTTPHeaders: {
+      blobContentType: "application/json",
+      blobContentDisposition: "inline",
+    },
+  });
 
   //S3 bucket url for the invoice
-  const urlJSON = `https://${process.env.DO_BUCKET}.${process.env.DO_REGION}.digitaloceanspaces.com/${fileNameJSON}`;
+  const urlJSON = `https://${process.env.AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/${process.env.AZURE_BLOB_CONTAINER}/${fileNameJSON}`;
 
   console.log(urlJSON, "url JSON");
 

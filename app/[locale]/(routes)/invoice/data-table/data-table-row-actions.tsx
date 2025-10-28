@@ -25,7 +25,6 @@ import { useState } from "react";
 import axios from "axios";
 import InvoiceViewModal from "@/components/modals/invoice-view-modal";
 
-import RossumCockpit from "../components/RossumCockpit";
 import Link from "next/link";
 import LoadingModal from "@/components/modals/loading-modal";
 import { useAppStore } from "@/store/store";
@@ -49,7 +48,6 @@ export function DataTableRowActions<TData>({
 }: DataTableRowActionsProps<TData>) {
   const [open, setOpen] = useState(false);
   const [openView, setOpenView] = useState(false);
-  const [openRossumView, setOpenRossumView] = useState(false);
   const [openTestSheet, setOpenTestSheet] = useState(false);
 
   //zustand
@@ -88,30 +86,6 @@ export function DataTableRowActions<TData>({
     }
   };
 
-  const onExtract = async () => {
-    setLoading(true);
-    setLoadingOpen(true);
-    try {
-      await axios.get(
-        `/api/invoice/rossum/get-annotation/${invoice.rossum_annotation_id}`
-      );
-      toast({
-        title: "Success",
-        description: `Data from invoice with annotation ID ${invoice.rossum_annotation_id} has been extracted`,
-      });
-    } catch (error: any) {
-      //console.log(error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.response.data.error,
-      });
-    } finally {
-      setLoadingOpen(false);
-      setLoading(false);
-      router.refresh();
-    }
-  };
 
   const onMoneyS3export = async () => {
     setLoading(true);
@@ -168,11 +142,6 @@ export function DataTableRowActions<TData>({
         loading={loading}
       />
       <LoadingModal
-        title="Extracting data from Rossum"
-        description="Extracting data from Invoice via Rossum Ai tool. Extracted data will be saved in the database. Please wait..."
-        isOpen={loadingOpen}
-      />
-      <LoadingModal
         title="Exporting XML for Money S3"
         description="Exporting XML for Money S3. Please wait..."
         isOpen={loadingMoneyS3export}
@@ -197,20 +166,6 @@ export function DataTableRowActions<TData>({
               src={invoice.invoice_file_url}
             />
           </div>
-          <SheetClose asChild>
-            <Button>Close</Button>
-          </SheetClose>
-        </SheetContent>
-      </Sheet>
-      <Sheet open={openRossumView} onOpenChange={setOpenRossumView}>
-        <SheetContent className="min-w-[90vh] max-w-full">
-          <SheetHeader>
-            <SheetTitle>{"Update Invoice" + " - " + invoice?.id}</SheetTitle>
-            <SheetDescription>
-              Update invoice metadata with Rossum cockpit
-            </SheetDescription>
-          </SheetHeader>
-          <RossumCockpit invoiceData={row.original} />
           <SheetClose asChild>
             <Button>Close</Button>
           </SheetClose>
@@ -255,19 +210,6 @@ export function DataTableRowActions<TData>({
               >
                 <Edit className="mr-2 w-4 h-4" />
                 Create task from Invoice
-              </DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          <DropdownMenuSeparator />
-
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>Rossum</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              <DropdownMenuItem onClick={() => setOpenRossumView(true)}>
-                Edit metadata with Rossum cockpit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onExtract}>
-                Extract data from invoice
               </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
@@ -325,19 +267,6 @@ export function DataTableRowActions<TData>({
             <>
               <DropdownMenuSeparator />
               <DropdownMenuLabel>Development mode only</DropdownMenuLabel>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <DropdownMenuItem>Rossum annotation JSON</DropdownMenuItem>
-                  <DropdownMenuSubContent>
-                    <Link
-                      href={`/invoice/annotation/${invoice.rossum_annotation_id}`}
-                      target="_blank"
-                    >
-                      <DropdownMenuItem>Show annotation</DropdownMenuItem>
-                    </Link>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSubTrigger>
-              </DropdownMenuSub>
             </>
           )}
         </DropdownMenuContent>
