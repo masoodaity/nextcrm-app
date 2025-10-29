@@ -53,21 +53,67 @@ const DashboardPage = async () => {
   //Fetch translations from dictionary
   const dict = await getDictionary(lang as "en" | "cz" | "de" | "uk"); //Fetch data for dashboard
 
-  const modules = await getModules();
-  const leads = await getLeadsCount();
-  const tasks = await getTasksCount();
-  const employees = await getEmployees();
-  const storage = await getStorageSize();
-  const projects = await getBoardsCount();
-  const contacts = await getContactCount();
-  const contracts = await getContractsCount();
-  const users = await getActiveUsersCount();
-  const accounts = await getAccountsCount();
-  const invoices = await getInvoicesCount();
-  const revenue = await getExpectedRevenue();
-  const documents = await getDocumentsCount();
-  const opportunities = await getOpportunitiesCount();
-  const usersTasks = await getUsersTasksCount(userId);
+  let modules = [] as any[];
+  let leads = 0;
+  let tasks = 0;
+  let employees: any[] = [];
+  let storage = 0;
+  let projects = 0;
+  let contacts = 0;
+  let contracts = 0;
+  let users = 0;
+  let accounts = 0;
+  let invoices = 0;
+  let revenue = 0;
+  let documents = 0;
+  let opportunities = 0;
+  let usersTasks = 0;
+
+  try {
+    modules = await getModules();
+  } catch {}
+  try {
+    leads = await getLeadsCount();
+  } catch {}
+  try {
+    tasks = await getTasksCount();
+  } catch {}
+  try {
+    employees = await getEmployees();
+  } catch {}
+  try {
+    storage = await getStorageSize();
+  } catch {}
+  try {
+    projects = await getBoardsCount();
+  } catch {}
+  try {
+    contacts = await getContactCount();
+  } catch {}
+  try {
+    contracts = await getContractsCount();
+  } catch {}
+  try {
+    users = await getActiveUsersCount();
+  } catch {}
+  try {
+    accounts = await getAccountsCount();
+  } catch {}
+  try {
+    invoices = await getInvoicesCount();
+  } catch {}
+  try {
+    revenue = await getExpectedRevenue();
+  } catch {}
+  try {
+    documents = await getDocumentsCount();
+  } catch {}
+  try {
+    opportunities = await getOpportunitiesCount();
+  } catch {}
+  try {
+    usersTasks = await getUsersTasksCount(userId);
+  } catch {}
 
   //Find which modules are enabled
   const crmModule = modules.find((module) => module.name === "crm");
