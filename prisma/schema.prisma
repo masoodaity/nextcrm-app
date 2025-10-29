@@ -70,12 +70,19 @@ model crm_Leads {
   jobTitle           String?
   email              String?
   phone              String?
+  whatsapp_phone     String?
   description        String?
   lead_source        String?
+  website_url        String?
+  twitter_username   String?
+  linkedin_url       String?
   refered_by         String?
   campaign           String?
-  status             String?       @default("NEW")
+  status             String?       @default("COLD_OUTREACH_SENT")
   type               String?       @default("DEMO")
+  follow_up_count    Int?
+  next_action        String?
+  start_date         DateTime?     @db.Date
   assigned_to        String?       @db.ObjectId
   assigned_to_user   Users?        @relation(fields: [assigned_to], references: [id])
   accountsIDs        String?       @db.ObjectId
@@ -85,10 +92,15 @@ model crm_Leads {
 }
 
 enum crm_Lead_Status {
-  NEW
-  CONTACTED
+  COLD_OUTREACH_SENT
+  FOLLOW_UP_ONE
+  FOLLOW_UP_TWO
+  RESPONDED
+  HANDED_TO_AE
+  IN_DEMO_PROCESS
   QUALIFIED
-  LOST
+  FAIL_CLOSED
+  SUCCESS_CLOSED
 }
 
 enum crm_Lead_Type {

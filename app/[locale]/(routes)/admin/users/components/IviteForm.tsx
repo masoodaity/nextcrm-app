@@ -60,10 +60,25 @@ export function InviteForm() {
           description: response.data.error,
         });
       } else {
+        // Show login details to admin
+        const loginDetails = response.data.loginDetails;
         toast({
-          title: "Success!",
-          description: "User invited successfully.",
+          title: "User Created Successfully!",
+          description: `Share these login details with ${data.name}:`,
+          duration: 10000,
         });
+        
+        // Show detailed login info in console and alert
+        const loginInfo = `
+📧 Email: ${loginDetails.email}
+🔑 Password: ${loginDetails.password}
+🌐 Login URL: ${loginDetails.loginUrl}
+
+Copy this information and share it with ${data.name}!
+        `;
+        
+        console.log(loginInfo);
+        alert(loginInfo);
       }
     } catch (error) {
       toast({

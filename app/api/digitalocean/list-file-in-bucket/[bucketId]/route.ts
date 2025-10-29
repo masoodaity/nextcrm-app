@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { s3Client } from "@/lib/digital-ocean-s3";
+import { getS3Client } from "@/lib/digital-ocean-s3";
 import {
   BucketAlreadyExists,
   ListBucketsCommand,
@@ -24,6 +24,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ bucke
 
   const bucketParams = { Bucket: bucketId };
 
+  const s3Client = getS3Client();
   const data = await s3Client.send(new ListObjectsCommand(bucketParams));
   console.log("Success", data);
 

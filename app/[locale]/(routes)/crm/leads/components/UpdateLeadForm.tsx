@@ -34,6 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import fetcher from "@/lib/fetcher";
 import useSWR from "swr";
 import SuspenseLoading from "@/components/loadings/suspense";
+import { statuses } from "../table-data/data";
 
 //TODO: fix all the types
 type NewTaskFormProps = {
@@ -59,22 +60,21 @@ export function UpdateLeadForm({ initialData, setOpen }: NewTaskFormProps) {
 
   const formSchema = z.object({
     id: z.string().min(5).max(30),
-    firstName: z.string().optional().nullable(),
+    firstName: z.string().optional().or(z.literal("")),
     lastName: z.string().min(3).max(30).nonempty(),
-    company: z.string().nullable().optional(),
-    jobTitle: z.string().nullable().optional(),
-    email: z.string().email().nullable().optional(),
-    phone: z.string().min(0).max(15).nullable().optional(),
-    description: z.string().nullable().optional(),
-    lead_source: z.string().nullable().optional(),
-    refered_by: z.string().optional().nullable(),
-    //TODO: add campaing schema from db as data source
-    campaign: z.string().optional().nullable(),
-    assigned_to: z.string().optional(),
+    email: z.string().email().optional().or(z.literal("")),
+    phone: z.string().optional().or(z.literal("")),
+    whatsapp_phone: z.string().optional().or(z.literal("")),
+    website_url: z.string().url().optional().or(z.literal("")),
+    lead_source: z.string().optional().or(z.literal("")),
+    assigned_to: z.string().optional().or(z.literal("")),
     status: z.string(),
-    //TODO: add type schema from db as data source
-    type: z.string().optional(),
-    accountIDs: z.string().optional(),
+    // accept string or number in form; coerce on submit in API if needed
+    follow_up_count: z.union([z.string(), z.number()]).optional().or(z.literal("")),
+    next_action: z.string().optional().or(z.literal("")),
+    twitter_username: z.string().optional().or(z.literal("")),
+    linkedin_url: z.string().url().optional().or(z.literal("")),
+    start_date: z.string().optional().or(z.literal("")),
   });
 
   type NewLeadFormValues = z.infer<typeof formSchema>;
@@ -82,7 +82,23 @@ export function UpdateLeadForm({ initialData, setOpen }: NewTaskFormProps) {
   //TODO: fix this any
   const form = useForm<any>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData,
+    defaultValues: {
+      id: initialData?.id || "",
+      firstName: initialData?.firstName || "",
+      lastName: initialData?.lastName || "",
+      email: initialData?.email || "",
+      phone: initialData?.phone || "",
+      whatsapp_phone: initialData?.whatsapp_phone || "",
+      website_url: initialData?.website_url || "",
+      lead_source: initialData?.lead_source || "",
+      assigned_to: initialData?.assigned_to || "",
+      status: initialData?.status || "COLD_OUTREACH_SENT",
+      follow_up_count: initialData?.follow_up_count ?? undefined,
+      next_action: initialData?.next_action || "",
+      twitter_username: initialData?.twitter_username || "",
+      linkedin_url: initialData?.linkedin_url || "",
+      start_date: initialData?.start_date ? String(initialData.start_date).substring(0,10) : "",
+    },
   });
 
   const onSubmit = async (data: NewLeadFormValues) => {
@@ -167,36 +183,7 @@ export function UpdateLeadForm({ initialData, setOpen }: NewTaskFormProps) {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="company"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Company</FormLabel>
-                  <FormControl>
-                    <Input
-                      disabled={isLoading}
-                      placeholder="NextCRM Inc."
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="jobTitle"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Job Title</FormLabel>
-                  <FormControl>
-                    <Input disabled={isLoading} placeholder="CTO" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            
             <FormField
               control={form.control}
               name="email"
@@ -232,35 +219,15 @@ export function UpdateLeadForm({ initialData, setOpen }: NewTaskFormProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      disabled={isLoading}
-                      placeholder="New NextCRM functionality"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            
             <FormField
               control={form.control}
               name="lead_source"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Lead source</FormLabel>
+                  <FormLabel>Lead Source Channel</FormLabel>
                   <FormControl>
-                    <Textarea
-                      disabled={isLoading}
-                      placeholder="Website"
-                      {...field}
-                    />
+                    <Input disabled={isLoading} placeholder="Website / LinkedIn / Email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -268,16 +235,12 @@ export function UpdateLeadForm({ initialData, setOpen }: NewTaskFormProps) {
             />
             <FormField
               control={form.control}
-              name="refered_by"
+              name="website_url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Refered by</FormLabel>
+                  <FormLabel>Website URL</FormLabel>
                   <FormControl>
-                    <Textarea
-                      disabled={isLoading}
-                      placeholder="Johny Walker"
-                      {...field}
-                    />
+                    <Input disabled={isLoading} placeholder="https://company.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -285,16 +248,64 @@ export function UpdateLeadForm({ initialData, setOpen }: NewTaskFormProps) {
             />
             <FormField
               control={form.control}
-              name="campaign"
+              name="twitter_username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Campaign</FormLabel>
+                  <FormLabel>Twitter username</FormLabel>
                   <FormControl>
-                    <Textarea
-                      disabled={isLoading}
-                      placeholder="Social networks"
-                      {...field}
-                    />
+                    <Input disabled={isLoading} placeholder="@username" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="linkedin_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>LinkedIn URL</FormLabel>
+                  <FormControl>
+                    <Input disabled={isLoading} placeholder="https://linkedin.com/in/..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="whatsapp_phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>WhatsApp Phone Number</FormLabel>
+                  <FormControl>
+                    <Input disabled={isLoading} placeholder="+11 123 456 789" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="follow_up_count"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Follow-up count</FormLabel>
+                  <FormControl>
+                    <Input disabled={isLoading} placeholder="0" type="number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="next_action"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Next action</FormLabel>
+                  <FormControl>
+                    <Input disabled={isLoading} placeholder="Call on Friday" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -307,7 +318,7 @@ export function UpdateLeadForm({ initialData, setOpen }: NewTaskFormProps) {
                   name="assigned_to"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Assigned to</FormLabel>
+                      <FormLabel>Contact owner</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}
@@ -329,33 +340,7 @@ export function UpdateLeadForm({ initialData, setOpen }: NewTaskFormProps) {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="accountIDs"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Assign an Account</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Choose assigned account " />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {accounts.map((account: any) => (
-                            <SelectItem key={account.id} value={account.id}>
-                              {account.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                
               </div>
               <div className="w-1/2 space-y-3">
                 <FormField
@@ -363,7 +348,7 @@ export function UpdateLeadForm({ initialData, setOpen }: NewTaskFormProps) {
                   name="status"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Lead status</FormLabel>
+                      <FormLabel>Lead Stage</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}
@@ -374,9 +359,9 @@ export function UpdateLeadForm({ initialData, setOpen }: NewTaskFormProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {leadStatus.map((status: any) => (
-                            <SelectItem key={status.id} value={status.id}>
-                              {status.name}
+                          {statuses.map((status: any) => (
+                            <SelectItem key={status.value} value={status.value}>
+                              {status.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -387,16 +372,12 @@ export function UpdateLeadForm({ initialData, setOpen }: NewTaskFormProps) {
                 />
                 <FormField
                   control={form.control}
-                  name="type"
+                  name="start_date"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type</FormLabel>
+                      <FormLabel>Start date</FormLabel>
                       <FormControl>
-                        <Input
-                          disabled={isLoading}
-                          placeholder="Social networks"
-                          {...field}
-                        />
+                        <Input disabled={isLoading} type="date" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
