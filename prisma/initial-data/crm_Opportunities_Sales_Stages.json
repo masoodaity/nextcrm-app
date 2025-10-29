@@ -1,56 +1,56 @@
 [
   {
     "v": 0,
-    "name": "New",
-    "order": 0,
+    "name": "Cold Outreach SENT",
+    "order": 1,
+    "probability": 5
+  },
+  {
+    "v": 0,
+    "name": "FOLLOW-UP-ONE",
+    "order": 2,
     "probability": 10
   },
   {
     "v": 0,
-    "name": "Need analysis",
-    "order": 0,
+    "name": "FOLLOW-UP-TWO",
+    "order": 3,
+    "probability": 15
+  },
+  {
+    "v": 0,
+    "name": "RESPONDED",
+    "order": 4,
     "probability": 25
   },
   {
     "v": 0,
-    "name": "Signing",
-    "probability": 95,
-    "order": null
+    "name": "HANDED TO AE",
+    "order": 5,
+    "probability": 40
   },
   {
     "v": 0,
-    "name": "Offer sent",
-    "probability": 30,
-    "order": null
+    "name": "IN-DEMO PROCESS",
+    "order": 6,
+    "probability": 60
   },
   {
     "v": 0,
-    "name": "Offer accepted",
-    "probability": 45,
-    "order": null
+    "name": "QUALIFIED",
+    "order": 7,
+    "probability": 80
   },
   {
     "v": 0,
-    "name": "Contract draft",
-    "probability": 65,
-    "order": null
+    "name": "FAIL-CLOSED",
+    "order": 8,
+    "probability": 0
   },
   {
     "v": 0,
-    "name": "Contract negotiation",
-    "probability": 75,
-    "order": null
-  },
-  {
-    "v": 0,
-    "name": "Send for signing",
-    "probability": 80,
-    "order": null
-  },
-  {
-    "v": 0,
-    "name": "Realization of the project",
-    "probability": 100,
-    "order": null
+    "name": "SUCCESS-CLOSED",
+    "order": 9,
+    "probability": 100
   }
 ]

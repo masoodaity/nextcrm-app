@@ -50,30 +50,56 @@ export function NewLeadForm({ users, accounts }: NewTaskFormProps) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const formSchema = z.object({
+    email: z.string().email().optional().or(z.literal("")),
     first_name: z.string(),
     last_name: z.string().min(3).max(30).nonempty(),
-    company: z.string().optional(),
-    jobTitle: z.string().optional(),
-    email: z.string().email().optional(),
-    phone: z.string().min(0).max(15).optional(),
-    description: z.string().optional(),
-    lead_source: z.string().optional(),
-    refered_by: z.string().optional(),
-    campaign: z.string().optional(),
-    assigned_to: z.string().optional(),
-    accountIDs: z.string().optional(),
+    assigned_to: z.string().optional().or(z.literal("")),
+    phone: z.string().optional().or(z.literal("")),
+    whatsapp_phone: z.string().optional().or(z.literal("")),
+    website_url: z.string().url().optional().or(z.literal("")),
+    lead_source: z.string().optional().or(z.literal("")),
+    status: z.string().optional().or(z.literal("")),
+    // treat as text input, convert before submit
+    follow_up_count: z.string().optional().or(z.literal("")),
+    next_action: z.string().optional().or(z.literal("")),
+    twitter_username: z.string().optional().or(z.literal("")),
+    linkedin_url: z.string().url().optional().or(z.literal("")),
+    start_date: z.string().optional().or(z.literal("")),
   });
 
   type NewLeadFormValues = z.infer<typeof formSchema>;
 
   const form = useForm<NewLeadFormValues>({
     resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: "",
+      first_name: "",
+      last_name: "",
+      assigned_to: "",
+      phone: "",
+      whatsapp_phone: "",
+      website_url: "",
+      lead_source: "",
+      status: "COLD_OUTREACH_SENT",
+      follow_up_count: "",
+      next_action: "",
+      twitter_username: "",
+      linkedin_url: "",
+      start_date: "",
+    },
   });
 
   const onSubmit = async (data: NewLeadFormValues) => {
     setIsLoading(true);
     try {
-      await axios.post("/api/crm/leads", data);
+      const payload: any = {
+        ...data,
+        follow_up_count:
+          data.follow_up_count && String(data.follow_up_count).trim() !== ""
+            ? Number(data.follow_up_count)
+            : undefined,
+      };
+      await axios.post("/api/crm/leads", payload);
       toast({
         title: "Success",
         description: "Lead created successfully",
@@ -87,18 +113,20 @@ export function NewLeadForm({ users, accounts }: NewTaskFormProps) {
     } finally {
       setIsLoading(false);
       form.reset({
+        email: "",
         first_name: "",
         last_name: "",
-        company: "",
-        jobTitle: "",
-        email: "",
-        phone: "",
-        description: "",
-        lead_source: "",
-        refered_by: "",
-        campaign: "",
         assigned_to: "",
-        accountIDs: "",
+        phone: "",
+        whatsapp_phone: "",
+        website_url: "",
+        lead_source: "",
+        status: "COLD_OUTREACH_SENT",
+        follow_up_count: undefined,
+        next_action: "",
+        twitter_username: "",
+        linkedin_url: "",
+        start_date: "",
       });
       router.refresh();
     }
@@ -149,36 +177,7 @@ export function NewLeadForm({ users, accounts }: NewTaskFormProps) {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="company"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Company</FormLabel>
-                  <FormControl>
-                    <Input
-                      disabled={isLoading}
-                      placeholder="NextCRM Inc."
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="jobTitle"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Job Title</FormLabel>
-                  <FormControl>
-                    <Input disabled={isLoading} placeholder="CTO" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            
             <FormField
               control={form.control}
               name="email"
@@ -214,35 +213,15 @@ export function NewLeadForm({ users, accounts }: NewTaskFormProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      disabled={isLoading}
-                      placeholder="New NextCRM functionality"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            
             <FormField
               control={form.control}
               name="lead_source"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Lead source</FormLabel>
+                  <FormLabel>Lead Source Channel</FormLabel>
                   <FormControl>
-                    <Textarea
-                      disabled={isLoading}
-                      placeholder="Website"
-                      {...field}
-                    />
+                    <Input disabled={isLoading} placeholder="Website / LinkedIn / Email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -250,16 +229,12 @@ export function NewLeadForm({ users, accounts }: NewTaskFormProps) {
             />
             <FormField
               control={form.control}
-              name="refered_by"
+              name="website_url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Refered by</FormLabel>
+                  <FormLabel>Website URL</FormLabel>
                   <FormControl>
-                    <Textarea
-                      disabled={isLoading}
-                      placeholder="Johny Walker"
-                      {...field}
-                    />
+                    <Input disabled={isLoading} placeholder="https://company.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -267,16 +242,64 @@ export function NewLeadForm({ users, accounts }: NewTaskFormProps) {
             />
             <FormField
               control={form.control}
-              name="campaign"
+              name="twitter_username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Campaign</FormLabel>
+                  <FormLabel>Twitter username</FormLabel>
                   <FormControl>
-                    <Textarea
-                      disabled={isLoading}
-                      placeholder="Social networks"
-                      {...field}
-                    />
+                    <Input disabled={isLoading} placeholder="@username" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="linkedin_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>LinkedIn URL</FormLabel>
+                  <FormControl>
+                    <Input disabled={isLoading} placeholder="https://linkedin.com/in/..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="whatsapp_phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>WhatsApp Phone Number</FormLabel>
+                  <FormControl>
+                    <Input disabled={isLoading} placeholder="+11 123 456 789" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="follow_up_count"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Follow-up count</FormLabel>
+                  <FormControl>
+                    <Input disabled={isLoading} placeholder="0" type="number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="next_action"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Next action</FormLabel>
+                  <FormControl>
+                    <Input disabled={isLoading} placeholder="Call on Friday" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -287,7 +310,7 @@ export function NewLeadForm({ users, accounts }: NewTaskFormProps) {
               name="assigned_to"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Assigned to</FormLabel>
+                  <FormLabel>Contact owner</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
@@ -311,27 +334,44 @@ export function NewLeadForm({ users, accounts }: NewTaskFormProps) {
             />
             <FormField
               control={form.control}
-              name="accountIDs"
+              name="status"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Assign an Account</FormLabel>
+                  <FormLabel>Lead Stage</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    defaultValue={field.value || "COLD_OUTREACH_SENT"}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Choose assigned account " />
+                        <SelectValue placeholder="Select lead status" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {accounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="COLD_OUTREACH_SENT">Cold Outreach SENT</SelectItem>
+                      <SelectItem value="FOLLOW_UP_ONE">FOLLOW-UP-ONE</SelectItem>
+                      <SelectItem value="FOLLOW_UP_TWO">FOLLOW-UP-TWO</SelectItem>
+                      <SelectItem value="RESPONDED">RESPONDED</SelectItem>
+                      <SelectItem value="HANDED_TO_AE">HANDED TO AE</SelectItem>
+                      <SelectItem value="IN_DEMO_PROCESS">IN-DEMO PROCESS</SelectItem>
+                      <SelectItem value="QUALIFIED">QUALIFIED</SelectItem>
+                      <SelectItem value="FAIL_CLOSED">FAIL-CLOSED</SelectItem>
+                      <SelectItem value="SUCCESS_CLOSED">SUCCESS-CLOSED</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="start_date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Start date</FormLabel>
+                  <FormControl>
+                    <Input disabled={isLoading} type="date" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

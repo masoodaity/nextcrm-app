@@ -26,6 +26,7 @@ type Props = {
 const ModuleMenu = ({ modules, dict, build }: Props) => {
   const [open, setOpen] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
+  const hiddenModules = new Set(["invoice", "openai", "secondBrain", "documents"]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -79,7 +80,9 @@ const ModuleMenu = ({ modules, dict, build }: Props) => {
           ) : null}
           {modules.find(
             (menuItem: any) =>
-              menuItem.name === "secondBrain" && menuItem.enabled
+              menuItem.name === "secondBrain" &&
+              menuItem.enabled &&
+              !hiddenModules.has(menuItem.name)
           ) ? (
             <SecondBrainModuleMenu open={open} />
           ) : null}
@@ -89,7 +92,10 @@ const ModuleMenu = ({ modules, dict, build }: Props) => {
             <EmployeesModuleMenu open={open} />
           ) : null}
           {modules.find(
-            (menuItem: any) => menuItem.name === "invoice" && menuItem.enabled
+            (menuItem: any) =>
+              menuItem.name === "invoice" &&
+              menuItem.enabled &&
+              !hiddenModules.has(menuItem.name)
           ) ? (
             <InvoicesModuleMenu open={open} title={dict.ModuleMenu.invoices} />
           ) : null}
@@ -99,7 +105,10 @@ const ModuleMenu = ({ modules, dict, build }: Props) => {
             <ReportsModuleMenu open={open} title={dict.ModuleMenu.reports} />
           ) : null}
           {modules.find(
-            (menuItem: any) => menuItem.name === "documents" && menuItem.enabled
+            (menuItem: any) =>
+              menuItem.name === "documents" &&
+              menuItem.enabled &&
+              !hiddenModules.has(menuItem.name)
           ) ? (
             <DocumentsModuleMenu
               open={open}
@@ -112,7 +121,10 @@ const ModuleMenu = ({ modules, dict, build }: Props) => {
             <DataboxModuleMenu open={open} />
           ) : null}
           {modules.find(
-            (menuItem: any) => menuItem.name === "openai" && menuItem.enabled
+            (menuItem: any) =>
+              menuItem.name === "openai" &&
+              menuItem.enabled &&
+              !hiddenModules.has(menuItem.name)
           ) ? (
             <ChatGPTModuleMenu open={open} />
           ) : null}
