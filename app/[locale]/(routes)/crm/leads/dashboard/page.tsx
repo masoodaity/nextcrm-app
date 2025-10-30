@@ -2,6 +2,15 @@ import { authOptions } from "@/lib/auth";
 import { prismadb } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import Container from "../../../components/ui/Container";
+import { OwnerLeadsDialog } from "./OwnerLeadsDialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 function countBy<T extends string | null | undefined>(items: T[]) {
   const map = new Map<string, number>();
@@ -23,12 +32,26 @@ export default async function LeadsDashboardPage() {
       id: true,
       status: true,
       createdAt: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      company: true,
       assigned_to_user: { select: { id: true, name: true } },
     },
   });
   
 
   const totalLeads = leads.length;
+  const leadsToday = leads.filter((l) => {
+    const d = l.createdAt ? new Date(l.createdAt) : null;
+    if (!d) return false;
+    const now = new Date();
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  }).length;
   const leadsThisWeek = leads.filter((l) => {
     const d = l.createdAt ? new Date(l.createdAt) : null;
     if (!d) return false;
@@ -91,9 +114,34 @@ export default async function LeadsDashboardPage() {
     leads.map((l) => l.assigned_to_user?.name as string | undefined)
   );
 
+  const ownerToLeads = new Map<string, typeof leads>();
+  for (const l of leads) {
+    const key = l.assigned_to_user?.name || "NULL";
+    if (!ownerToLeads.has(key)) ownerToLeads.set(key, [] as any);
+    (ownerToLeads.get(key) as any).push(l);
+  }
+
+  // Build pivot: owner x stage => count
+  const owners = Array.from(new Set(leads.map((l) => l.assigned_to_user?.name || "NULL")));
+  const pivot = new Map<string, Map<string, number>>();
+  for (const owner of owners) {
+    pivot.set(owner, new Map<string, number>());
+    for (const st of allPipelineStages) {
+      pivot.get(owner)!.set(st, 0);
+    }
+  }
+  for (const l of leads) {
+    const owner = l.assigned_to_user?.name || "NULL";
+    const st = (l.status as string | undefined) || undefined;
+    if (st && pivot.get(owner)?.has(st)) {
+      const current = pivot.get(owner)!.get(st) || 0;
+      pivot.get(owner)!.set(st, current + 1);
+    }
+  }
+
   return (
     <Container title="Leads dashboard" description="Track your outreach performance">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="border rounded-md p-4">
           <div className="text-sm text-muted-foreground">Total leads</div>
           <div className="text-3xl font-semibold">{totalLeads}</div>
@@ -101,6 +149,10 @@ export default async function LeadsDashboardPage() {
         <div className="border rounded-md p-4">
           <div className="text-sm text-muted-foreground">New this week</div>
           <div className="text-3xl font-semibold">{leadsThisWeek}</div>
+        </div>
+        <div className="border rounded-md p-4">
+          <div className="text-sm text-muted-foreground">Created today</div>
+          <div className="text-3xl font-semibold">{leadsToday}</div>
         </div>
         <div className="border rounded-md p-4">
           <div className="text-sm text-muted-foreground">Active stages</div>
@@ -185,16 +237,93 @@ export default async function LeadsDashboardPage() {
           <div className="space-y-2">
             {byOwner
               .sort((a, b) => b.value - a.value)
-              .map((o) => (
-                <div key={o.name} className="flex items-center justify-between">
-                  <span className="text-sm">{o.name}</span>
-                  <span className="text-sm font-semibold">{o.value}</span>
-                </div>
-              ))}
+              .map((o) => {
+                const stageLabels: { [key: string]: string } = {
+                  "NEW_LEAD": "New Lead",
+                  "OUTREACH_SENT": "Outreach Sent",
+                  "FOLLOW_UP_ONE": "Follow Up -1",
+                  "FOLLOW_UP_TWO": "Follow Up -2",
+                  "RESPONDED": "Responded",
+                  "HANDED_TO_AE": "Handed to AE",
+                  "IN_DEMO_PROCESS": "In Demo Process",
+                  "QUALIFIED": "Qualified",
+                  "FAIL_CLOSED": "Fail -Closed",
+                  "SUCCESS_CLOSED": "Success -Closed",
+                };
+                const list = ownerToLeads.get(o.name) || [];
+                return (
+                  <OwnerLeadsDialog
+                    key={o.name}
+                    ownerName={o.name}
+                    leads={list as any}
+                    stageLabels={stageLabels}
+                  >
+                    <button className="w-full text-left flex items-center justify-between hover:bg-accent/40 rounded px-2 py-1">
+                      <span className="text-sm">{o.name}</span>
+                      <span className="text-sm font-semibold">{o.value}</span>
+                    </button>
+                  </OwnerLeadsDialog>
+                );
+              })}
             {byOwner.length === 0 && (
               <div className="text-sm text-muted-foreground">No data</div>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="border rounded-md p-4 mt-6">
+        <div className="text-lg font-medium mb-3">Stages by owner</div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="whitespace-nowrap">Owner</TableHead>
+                {allPipelineStages.map((st) => {
+                  const stageLabels: { [key: string]: string } = {
+                    "NEW_LEAD": "New Lead",
+                    "OUTREACH_SENT": "Outreach Sent",
+                    "FOLLOW_UP_ONE": "Follow Up -1",
+                    "FOLLOW_UP_TWO": "Follow Up -2",
+                    "RESPONDED": "Responded",
+                    "HANDED_TO_AE": "Handed to AE",
+                    "IN_DEMO_PROCESS": "In Demo Process",
+                    "QUALIFIED": "Qualified",
+                    "FAIL_CLOSED": "Fail -Closed",
+                    "SUCCESS_CLOSED": "Success -Closed",
+                  };
+                  return (
+                    <TableHead key={st} className="whitespace-nowrap">{stageLabels[st] || st}</TableHead>
+                  );
+                })}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {owners
+                .sort((a, b) => {
+                  const asum = Array.from(pivot.get(a)?.values() || []).reduce((x, y) => x + y, 0);
+                  const bsum = Array.from(pivot.get(b)?.values() || []).reduce((x, y) => x + y, 0);
+                  return bsum - asum;
+                })
+                .map((owner) => (
+                  <TableRow key={owner}>
+                    <TableCell className="whitespace-nowrap">{owner}</TableCell>
+                    {allPipelineStages.map((st) => (
+                      <TableCell key={st} className="text-right tabular-nums">
+                        {pivot.get(owner)?.get(st) || 0}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              {owners.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={1 + allPipelineStages.length} className="text-sm text-muted-foreground">
+                    No data
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
       </div>
     </Container>
