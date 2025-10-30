@@ -80,7 +80,7 @@ export function NewLeadForm({ users, accounts }: NewTaskFormProps) {
       whatsapp_phone: "",
       website_url: "",
       lead_source: "",
-      status: "COLD_OUTREACH_SENT",
+      status: "OUTREACH_SENT",
       follow_up_count: "",
       next_action: "",
       twitter_username: "",
@@ -121,7 +121,7 @@ export function NewLeadForm({ users, accounts }: NewTaskFormProps) {
         whatsapp_phone: "",
         website_url: "",
         lead_source: "",
-        status: "COLD_OUTREACH_SENT",
+        status: "OUTREACH_SENT",
         follow_up_count: undefined,
         next_action: "",
         twitter_username: "",
@@ -340,7 +340,7 @@ export function NewLeadForm({ users, accounts }: NewTaskFormProps) {
                   <FormLabel>Lead Stage</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value || "COLD_OUTREACH_SENT"}
+                    defaultValue={field.value || "OUTREACH_SENT"}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -348,7 +348,7 @@ export function NewLeadForm({ users, accounts }: NewTaskFormProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="COLD_OUTREACH_SENT">Cold Outreach SENT</SelectItem>
+                      <SelectItem value="OUTREACH_SENT">Outreach Sent</SelectItem>
                       <SelectItem value="FOLLOW_UP_ONE">FOLLOW-UP-ONE</SelectItem>
                       <SelectItem value="FOLLOW_UP_TWO">FOLLOW-UP-TWO</SelectItem>
                       <SelectItem value="RESPONDED">RESPONDED</SelectItem>

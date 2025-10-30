@@ -57,7 +57,7 @@ export async function POST(req: Request) {
         lead_source,
         assigned_to: assigned_to || userId,
         accountsIDs: accountIDs,
-        status: status || "COLD_OUTREACH_SENT",
+        status: status || null,
         type: "DEMO",
         // new fields mapping
         whatsapp_phone,

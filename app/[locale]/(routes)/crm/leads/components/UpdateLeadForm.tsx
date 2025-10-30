@@ -92,7 +92,7 @@ export function UpdateLeadForm({ initialData, setOpen }: NewTaskFormProps) {
       website_url: initialData?.website_url || "",
       lead_source: initialData?.lead_source || "",
       assigned_to: initialData?.assigned_to || "",
-      status: initialData?.status || "COLD_OUTREACH_SENT",
+      status: initialData?.status || "OUTREACH_SENT",
       follow_up_count: initialData?.follow_up_count ?? undefined,
       next_action: initialData?.next_action || "",
       twitter_username: initialData?.twitter_username || "",

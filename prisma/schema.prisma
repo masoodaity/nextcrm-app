@@ -65,7 +65,7 @@ model crm_Leads {
   updatedAt          DateTime?     @updatedAt @db.Date
   updatedBy          String?       @db.ObjectId
   firstName          String?
-  lastName           String
+  lastName           String?
   company            String?
   jobTitle           String?
   email              String?
@@ -78,7 +78,7 @@ model crm_Leads {
   linkedin_url       String?
   refered_by         String?
   campaign           String?
-  status             String?       @default("COLD_OUTREACH_SENT")
+  status             crm_Lead_Status?
   type               String?       @default("DEMO")
   follow_up_count    Int?
   next_action        String?
@@ -92,7 +92,8 @@ model crm_Leads {
 }
 
 enum crm_Lead_Status {
-  COLD_OUTREACH_SENT
+  NEW_LEAD
+  OUTREACH_SENT
   FOLLOW_UP_ONE
   FOLLOW_UP_TWO
   RESPONDED

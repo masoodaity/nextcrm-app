@@ -6,7 +6,7 @@ import Container from "../../../components/ui/Container";
 function countBy<T extends string | null | undefined>(items: T[]) {
   const map = new Map<string, number>();
   for (const it of items) {
-    const key = String(it ?? "UNKNOWN");
+    const key = it ? String(it) : "NULL";
     map.set(key, (map.get(key) || 0) + 1);
   }
   return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
@@ -26,6 +26,7 @@ export default async function LeadsDashboardPage() {
       assigned_to_user: { select: { id: true, name: true } },
     },
   });
+  
 
   const totalLeads = leads.length;
   const leadsThisWeek = leads.filter((l) => {
@@ -57,16 +58,16 @@ export default async function LeadsDashboardPage() {
     );
   }).length;
 
-  const excludedStages = new Set(["FAIL_CLOSED", "SUCCESS_CLOSED"]);
   const byStage = countBy(
     leads
       .map((l) => l.status as string | undefined)
-      .filter((s) => s && !excludedStages.has(s))
-  );
+      .filter((s) => s)
+  ).filter(stage => stage.name !== "NULL");
 
   // KPI cards should show ALL stages (including closed) and 0s when missing
   const allPipelineStages = [
-    "COLD_OUTREACH_SENT",
+    "NEW_LEAD",
+    "OUTREACH_SENT",
     "FOLLOW_UP_ONE",
     "FOLLOW_UP_TWO",
     "RESPONDED",
@@ -76,17 +77,18 @@ export default async function LeadsDashboardPage() {
     "FAIL_CLOSED",
     "SUCCESS_CLOSED",
   ];
+  const statusCounts = countBy(leads.map((l) => l.status as string | undefined));
   const kpiStageMap = new Map(
-    countBy(leads.map((l) => l.status as string | undefined)).map((s) => [s.name, s.value] as const)
+    statusCounts.map((s) => [s.name, s.value] as const)
   );
   const allStageCards = allPipelineStages.map((name) => ({
     name,
     value: kpiStageMap.get(name) || 0,
-  }));
+  })).filter(stage => stage.name !== "NULL");
 
   // neutral styling only
   const byOwner = countBy(
-    leads.map((l) => (l.assigned_to_user?.name as string | undefined) || "Unassigned")
+    leads.map((l) => l.assigned_to_user?.name as string | undefined)
   );
 
   return (
@@ -123,12 +125,26 @@ export default async function LeadsDashboardPage() {
 
       <div className="mt-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-          {allStageCards.map((s) => (
-            <div key={s.name} className="border rounded-md p-4">
-              <div className="text-xs text-muted-foreground mb-1">{s.name.replaceAll("_", " ")}</div>
-              <div className="text-2xl font-semibold">{s.value}</div>
-            </div>
-          ))}
+          {allStageCards.map((s) => {
+            const stageLabels: { [key: string]: string } = {
+              "NEW_LEAD": "New Lead",
+              "OUTREACH_SENT": "Outreach Sent",
+              "FOLLOW_UP_ONE": "Follow Up -1",
+              "FOLLOW_UP_TWO": "Follow Up -2",
+              "RESPONDED": "Responded",
+              "HANDED_TO_AE": "Handed to AE",
+              "IN_DEMO_PROCESS": "In Demo Process",
+              "QUALIFIED": "Qualified",
+              "FAIL_CLOSED": "Fail -Closed",
+              "SUCCESS_CLOSED": "Success -Closed",
+            };
+            return (
+              <div key={s.name} className="border rounded-md p-4">
+                <div className="text-xs text-muted-foreground mb-1">{stageLabels[s.name] || s.name}</div>
+                <div className="text-2xl font-semibold">{s.value}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -138,12 +154,26 @@ export default async function LeadsDashboardPage() {
           <div className="space-y-2">
             {byStage
               .sort((a, b) => b.value - a.value)
-              .map((s) => (
-                <div key={s.name} className="flex items-center justify-between">
-                  <span className="text-sm">{s.name}</span>
-                  <span className="text-sm font-semibold">{s.value}</span>
-                </div>
-              ))}
+              .map((s) => {
+                const stageLabels: { [key: string]: string } = {
+                  "NEW_LEAD": "New Lead",
+                  "OUTREACH_SENT": "Outreach Sent",
+                  "FOLLOW_UP_ONE": "Follow Up -1",
+                  "FOLLOW_UP_TWO": "Follow Up -2",
+                  "RESPONDED": "Responded",
+                  "HANDED_TO_AE": "Handed to AE",
+                  "IN_DEMO_PROCESS": "In Demo Process",
+                  "QUALIFIED": "Qualified",
+                  "FAIL_CLOSED": "Fail -Closed",
+                  "SUCCESS_CLOSED": "Success -Closed",
+                };
+                return (
+                  <div key={s.name} className="flex items-center justify-between">
+                    <span className="text-sm">{stageLabels[s.name] || s.name}</span>
+                    <span className="text-sm font-semibold">{s.value}</span>
+                  </div>
+                );
+              })}
             {byStage.length === 0 && (
               <div className="text-sm text-muted-foreground">No data</div>
             )}
