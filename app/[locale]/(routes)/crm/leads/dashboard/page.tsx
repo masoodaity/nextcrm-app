@@ -3,6 +3,7 @@ import { prismadb } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import Container from "../../../components/ui/Container";
 import { OwnerLeadsDialog } from "./OwnerLeadsDialog";
+import { RangeFilter } from "./RangeFilter";
 import {
   Table,
   TableBody,
@@ -21,7 +22,7 @@ function countBy<T extends string | null | undefined>(items: T[]) {
   return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
 }
 
-export default async function LeadsDashboardPage() {
+export default async function LeadsDashboardPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return null;
@@ -40,9 +41,30 @@ export default async function LeadsDashboardPage() {
     },
   });
   
+  const range = (Array.isArray(searchParams?.range) ? searchParams?.range[0] : searchParams?.range) as ("all"|"week"|"today"|undefined) || "all";
 
-  const totalLeads = leads.length;
-  const leadsToday = leads.filter((l) => {
+  function inRange(d: Date | null | undefined) {
+    if (!d) return false;
+    const date = new Date(d);
+    const now = new Date();
+    if (range === "today") {
+      return (
+        date.getFullYear() === now.getFullYear() &&
+        date.getMonth() === now.getMonth() &&
+        date.getDate() === now.getDate()
+      );
+    }
+    if (range === "week") {
+      const diff = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
+      return diff <= 7;
+    }
+    return true; // all
+  }
+
+  const filteredLeads = leads.filter((l) => inRange(l.createdAt as any));
+
+  const totalLeads = filteredLeads.length;
+  const leadsToday = filteredLeads.filter((l) => {
     const d = l.createdAt ? new Date(l.createdAt) : null;
     if (!d) return false;
     const now = new Date();
@@ -52,7 +74,7 @@ export default async function LeadsDashboardPage() {
       d.getDate() === now.getDate()
     );
   }).length;
-  const leadsThisWeek = leads.filter((l) => {
+  const leadsThisWeek = filteredLeads.filter((l) => {
     const d = l.createdAt ? new Date(l.createdAt) : null;
     if (!d) return false;
     const now = new Date();
@@ -60,29 +82,10 @@ export default async function LeadsDashboardPage() {
     return diff <= 7;
   }).length;
 
-  const successClosedAll = leads.filter((l) => l.status === "SUCCESS_CLOSED").length;
-  const successClosedThisWeek = leads.filter((l) => {
-    if (l.status !== "SUCCESS_CLOSED") return false;
-    const d = l.createdAt ? new Date(l.createdAt) : null;
-    if (!d) return false;
-    const now = new Date();
-    const diff = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
-    return diff <= 7;
-  }).length;
-  const successClosedToday = leads.filter((l) => {
-    if (l.status !== "SUCCESS_CLOSED") return false;
-    const d = l.createdAt ? new Date(l.createdAt) : null;
-    if (!d) return false;
-    const now = new Date();
-    return (
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate()
-    );
-  }).length;
+  const successClosed = filteredLeads.filter((l) => l.status === "SUCCESS_CLOSED").length;
 
   const byStage = countBy(
-    leads
+    filteredLeads
       .map((l) => l.status as string | undefined)
       .filter((s) => s)
   ).filter(stage => stage.name !== "NULL");
@@ -100,7 +103,7 @@ export default async function LeadsDashboardPage() {
     "FAIL_CLOSED",
     "SUCCESS_CLOSED",
   ];
-  const statusCounts = countBy(leads.map((l) => l.status as string | undefined));
+  const statusCounts = countBy(filteredLeads.map((l) => l.status as string | undefined));
   const kpiStageMap = new Map(
     statusCounts.map((s) => [s.name, s.value] as const)
   );
@@ -111,18 +114,18 @@ export default async function LeadsDashboardPage() {
 
   // neutral styling only
   const byOwner = countBy(
-    leads.map((l) => l.assigned_to_user?.name as string | undefined)
+    filteredLeads.map((l) => l.assigned_to_user?.name as string | undefined)
   );
 
   const ownerToLeads = new Map<string, typeof leads>();
-  for (const l of leads) {
+  for (const l of filteredLeads) {
     const key = l.assigned_to_user?.name || "NULL";
     if (!ownerToLeads.has(key)) ownerToLeads.set(key, [] as any);
     (ownerToLeads.get(key) as any).push(l);
   }
 
   // Build pivot: owner x stage => count
-  const owners = Array.from(new Set(leads.map((l) => l.assigned_to_user?.name || "NULL")));
+  const owners = Array.from(new Set(filteredLeads.map((l) => l.assigned_to_user?.name || "NULL")));
   const pivot = new Map<string, Map<string, number>>();
   for (const owner of owners) {
     pivot.set(owner, new Map<string, number>());
@@ -130,7 +133,7 @@ export default async function LeadsDashboardPage() {
       pivot.get(owner)!.set(st, 0);
     }
   }
-  for (const l of leads) {
+  for (const l of filteredLeads) {
     const owner = l.assigned_to_user?.name || "NULL";
     const st = (l.status as string | undefined) || undefined;
     if (st && pivot.get(owner)?.has(st)) {
@@ -141,6 +144,9 @@ export default async function LeadsDashboardPage() {
 
   return (
     <Container title="Leads dashboard" description="Track your outreach performance">
+      <div className="flex items-center justify-end mb-4">
+        <RangeFilter value={range} />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="border rounded-md p-4">
           <div className="text-sm text-muted-foreground">Total leads</div>
@@ -160,18 +166,12 @@ export default async function LeadsDashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-        <div className="border rounded-md p-4">
-          <div className="text-sm text-muted-foreground">Success closed (all time)</div>
-          <div className="text-3xl font-semibold">{successClosedAll}</div>
-        </div>
-        <div className="border rounded-md p-4">
-          <div className="text-sm text-muted-foreground">Success closed (this week)</div>
-          <div className="text-3xl font-semibold">{successClosedThisWeek}</div>
-        </div>
-        <div className="border rounded-md p-4">
-          <div className="text-sm text-muted-foreground">Success closed (today)</div>
-          <div className="text-3xl font-semibold">{successClosedToday}</div>
+      <div className="mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="border rounded-md p-4">
+            <div className="text-sm text-muted-foreground">Success closed</div>
+            <div className="text-3xl font-semibold">{successClosed}</div>
+          </div>
         </div>
       </div>
 
