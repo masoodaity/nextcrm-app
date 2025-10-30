@@ -22,6 +22,32 @@ function countBy<T extends string | null | undefined>(items: T[]) {
   return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
 }
 
+function normalizeSource(raw?: string | null): string {
+  if (!raw) return "Unknown";
+  const s = String(raw).trim();
+  if (!s) return "Unknown";
+  // Treat date/time-like strings as Unknown (e.g., 29-10-2025 06:01)
+  if (/^\d{2}-\d{2}-\d{4}(?:\s+\d{2}:\d{2}(?::\d{2})?)?$/.test(s)) return "Unknown";
+  if (/^\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}(?::\d{2})?)?/.test(s)) return "Unknown";
+  // Canonicalize case variants
+  const u = s.toUpperCase();
+  const map: Record<string, string> = {
+    "LINKEDIN": "LinkedIn",
+    "INSTAGRAM": "Instagram",
+    "FACEBOOK": "Facebook",
+    "TWITTER": "Twitter",
+    "X": "Twitter",
+    "EMAIL": "Email",
+    "WEBFORM": "Webform",
+    "WEBSITE": "Website",
+    "WHATSAPP": "WhatsApp",
+    "GOOGLE": "Google",
+  };
+  if (map[u]) return map[u];
+  // Fallback: return original trimmed string
+  return s;
+}
+
 export default async function LeadsDashboardPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -37,6 +63,7 @@ export default async function LeadsDashboardPage({ searchParams }: { searchParam
       lastName: true,
       email: true,
       company: true,
+      lead_source: true,
       assigned_to_user: { select: { id: true, name: true } },
     },
   });
@@ -127,6 +154,7 @@ export default async function LeadsDashboardPage({ searchParams }: { searchParam
   // Build pivot: owner x stage => count
   const owners = Array.from(new Set(filteredLeads.map((l) => l.assigned_to_user?.name || "NULL")));
   const pivot = new Map<string, Map<string, number>>();
+  const ownerTopSource = new Map<string, string>();
   for (const owner of owners) {
     pivot.set(owner, new Map<string, number>());
     for (const st of allPipelineStages) {
@@ -140,6 +168,27 @@ export default async function LeadsDashboardPage({ searchParams }: { searchParam
       const current = pivot.get(owner)!.get(st) || 0;
       pivot.get(owner)!.set(st, current + 1);
     }
+    // track most frequent normalized lead source per owner
+    const key = owner;
+    const currentCounts = (ownerTopSource.get(key) ? JSON.parse(ownerTopSource.get(key) as string) : {}) as Record<string, number>;
+    const src = normalizeSource((l as any).lead_source);
+    if (src) {
+      currentCounts[src] = (currentCounts[src] || 0) + 1;
+      ownerTopSource.set(key, JSON.stringify(currentCounts));
+    }
+  }
+  // reduce counts to top source label
+  for (const [owner, countsJson] of Array.from(ownerTopSource.entries())) {
+    const counts = JSON.parse(countsJson) as Record<string, number>;
+    let top = "";
+    let max = -1;
+    for (const [src, cnt] of Object.entries(counts)) {
+      if (cnt > max) {
+        top = src;
+        max = cnt;
+      }
+    }
+    ownerTopSource.set(owner, top || "");
   }
 
   return (
@@ -279,6 +328,7 @@ export default async function LeadsDashboardPage({ searchParams }: { searchParam
             <TableHeader>
               <TableRow>
                 <TableHead className="whitespace-nowrap">Owner</TableHead>
+                <TableHead className="whitespace-nowrap">Top Source</TableHead>
                 {allPipelineStages.map((st) => {
                   const stageLabels: { [key: string]: string } = {
                     "NEW_LEAD": "New Lead",
@@ -308,6 +358,7 @@ export default async function LeadsDashboardPage({ searchParams }: { searchParam
                 .map((owner) => (
                   <TableRow key={owner}>
                     <TableCell className="whitespace-nowrap">{owner}</TableCell>
+                    <TableCell className="whitespace-nowrap">{ownerTopSource.get(owner) || "—"}</TableCell>
                     {allPipelineStages.map((st) => (
                       <TableCell key={st} className="text-right tabular-nums">
                         {pivot.get(owner)?.get(st) || 0}
@@ -317,13 +368,89 @@ export default async function LeadsDashboardPage({ searchParams }: { searchParam
                 ))}
               {owners.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={1 + allPipelineStages.length} className="text-sm text-muted-foreground">
+                  <TableCell colSpan={2 + allPipelineStages.length} className="text-sm text-muted-foreground">
                     No data
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
+        </div>
+      </div>
+
+      <div className="border rounded-md p-4 mt-6">
+        <div className="text-lg font-medium mb-3">Stages by source</div>
+        <div className="overflow-x-auto">
+          {(() => {
+            const sources = Array.from(new Set(filteredLeads.map((l) => normalizeSource((l as any).lead_source))));
+            const pivotSource = new Map<string, Map<string, number>>();
+            const totals = new Map<string, number>();
+            for (const src of sources) {
+              pivotSource.set(src, new Map<string, number>());
+              for (const st of allPipelineStages) {
+                pivotSource.get(src)!.set(st, 0);
+              }
+              totals.set(src, 0);
+            }
+            for (const l of filteredLeads) {
+              const src = normalizeSource((l as any).lead_source) as string;
+              const st = (l.status as string | undefined) || undefined;
+              if (st && pivotSource.get(src)?.has(st)) {
+                const current = pivotSource.get(src)!.get(st) || 0;
+                pivotSource.get(src)!.set(st, current + 1);
+                totals.set(src, (totals.get(src) || 0) + 1);
+              }
+            }
+            return (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">Source</TableHead>
+                    <TableHead className="whitespace-nowrap text-right">Total</TableHead>
+                    {allPipelineStages.map((st) => {
+                      const stageLabels: { [key: string]: string } = {
+                        "NEW_LEAD": "New Lead",
+                        "OUTREACH_SENT": "Outreach Sent",
+                        "FOLLOW_UP_ONE": "Follow Up -1",
+                        "FOLLOW_UP_TWO": "Follow Up -2",
+                        "RESPONDED": "Responded",
+                        "HANDED_TO_AE": "Handed to AE",
+                        "IN_DEMO_PROCESS": "In Demo Process",
+                        "QUALIFIED": "Qualified",
+                        "FAIL_CLOSED": "Fail -Closed",
+                        "SUCCESS_CLOSED": "Success -Closed",
+                      };
+                      return (
+                        <TableHead key={st} className="whitespace-nowrap">{stageLabels[st] || st}</TableHead>
+                      );
+                    })}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sources
+                    .sort((a, b) => (totals.get(b) || 0) - (totals.get(a) || 0))
+                    .map((src) => (
+                      <TableRow key={src}>
+                        <TableCell className="whitespace-nowrap">{src}</TableCell>
+                        <TableCell className="text-right tabular-nums">{totals.get(src) || 0}</TableCell>
+                        {allPipelineStages.map((st) => (
+                          <TableCell key={st} className="text-right tabular-nums">
+                            {pivotSource.get(src)?.get(st) || 0}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  {sources.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={2 + allPipelineStages.length} className="text-sm text-muted-foreground">
+                        No data
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            );
+          })()}
         </div>
       </div>
     </Container>
